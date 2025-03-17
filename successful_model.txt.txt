@@ -1,0 +1,42 @@
+# Imports and Environment Setup
+import torch
+import os
+from utils import load_image, save_image, imshow, load_images_from_folder
+from model import StyleTransferModel
+
+torch.backends.cudnn.enabled = False  # 临时禁用 cuDNN
+
+# Check if GPU is available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using device:", device)
+
+# Load content image
+content_image = load_image("data\content_1.jpg").to(device)
+
+# Load all style images
+style_images = load_images_from_folder("data/trainC")
+style_images = [img.to(device) for img in style_images]
+
+# Compute average style features
+style_features_list = []
+#At this stage, the model is not trained, only needs to be initialized to extract features
+#VGG19 is a pre-trained model used to extract features from the style images
+model = StyleTransferModel(content_image, style_images[0])  # Initialize once to use feature extraction
+for style_image in style_images:
+    style_features = model.extract_features(style_image)
+    style_features_list.append(style_features)
+
+print("Successfully extracted features for one style image.")
+# Compute the average style features
+average_style_features = {key: sum(features[key] for features in style_features_list) / len(style_features_list)
+                          for key in style_features_list[0].keys()}
+
+# Train the model with the average style features
+model = StyleTransferModel(content_image, style_images[0])  # Reuse model
+#The model is trained with the average style features
+output_image = model.train(average_style_features, num_steps=500)
+
+# Save the result
+save_path = "D:/pj_style_transfer/generated_images/final_result.jpg"
+save_image(output_image, save_path)
+print(f"The generated image has been saved to {save_path}")
